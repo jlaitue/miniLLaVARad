@@ -101,10 +101,15 @@ def main():
     gpus, time = RESOURCES[("finetune", 0)]
     write("train_T0_seed0_finetune.sbatch", header(args, "T0s0_fi", gpus, time) + train_command("finetune", 0, 0, gpus))
 
+    # T=1369 is trained last, so its generation runs get their own array.
     tasks = predict_tasks()
-    (GENERATED / "predict_tasks.txt").write_text("\n".join(tasks) + "\n")
-    runner = 'sed -n "${SLURM_ARRAY_TASK_ID}p" jobs/generated/predict_tasks.txt | bash -euo pipefail\n'
-    write("predict_array.sbatch", header(args, "predict", 1, "06:00:00", f"1-{len(tasks)}%{args_limit}") + runner)
+    groups = {"main": [t for t in tasks if "/T1369_seed" not in t], "T1369": [t for t in tasks if "/T1369_seed" in t]}
+    for group, lines in groups.items():
+        task_file = f"predict_tasks_{group}.txt"
+        (GENERATED / task_file).write_text("\n".join(lines) + "\n")
+        runner = f'sed -n "${{SLURM_ARRAY_TASK_ID}}p" jobs/generated/{task_file} | bash -euo pipefail\n'
+        write(f"predict_array_{group}.sbatch",
+              header(args, f"predict_{group}", 1, "06:00:00", f"1-{len(lines)}%{args_limit}") + runner)
 
     latency = "".join(
         f"python benchmark_latency.py --run_dir runs/T{tokens}_seed0/finetune --out results/latency/T{tokens}.json\n"
