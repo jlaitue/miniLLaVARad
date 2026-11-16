@@ -47,7 +47,7 @@ User's order (2026-11-16): cheap models first, T=1369 last. Goal is 3 fresh chec
 5. `latency.sbatch` (T=1 vs T=1369), `scripts/token_redundancy.py`, `scripts/attention_share.py`.
 6. Still to write: figures and tables, aggregate OOD finding counts (Reviewer 1), and the paper. Fix the LoRA citation (Hu et al.).
 
-## State at handoff (2026-11-02; updated 2026-11-16)
-Initial git commit made 2026-11-16. No jobs submitted yet. Waiting on the user to approve `00_smoke_2gpu.sbatch`, then the seed 0 jobs. `sbatch --test-only` showed these jobs would preempt running jobs (two checked were `preempt-big`), and the user was told. Regenerate scripts with `python jobs/make_jobs.py --hf_home ... --cache_home ...`. Full transcript of the earlier session: `~/.claude/projects/-scratch-ljl5178-project-beta-meduq/66f2ad74-2cbc-442a-99d9-0f9e8cd8cb14.jsonl`.
+## Current state (2026-11-16)
+Smoke tests passed on 2xA100 80GB (cair) for both stages of T=1 and T=1369; W&B logging verified (entity `foundation_uq`, projects `clinical-vlm-tokens` and `clinical-vlm-tokens-smoke`). A100 speeds: T=1 stage 1 4.3 s/batch (28 GB), T=1 stage 2 8.1 s/batch (34 GB), T=1369 stage 1 9.1 s/batch (45 GB), T=1369 stage 2 11.7 s/batch at per-GPU 16 (51 GB). Submitted on `-q cair` as a chain: T=1 alignment 19395853 -> T=1 finetune 19395854 (afterok) -> T=0 finetune 19395855 (afterany). Data counts were confirmed by the user to match LLaVA-Rad (400,042 train reports). Regenerate scripts with `python jobs/make_jobs.py --hf_home ... --cache_home ...`. Full transcript of the earlier session: `~/.claude/projects/-scratch-ljl5178-project-beta-meduq/66f2ad74-2cbc-442a-99d9-0f9e8cd8cb14.jsonl`.
 
 Reviews are in `../meduq/mech_interp_icml_reviews.md`. Do not print MIMIC or CheXpert report text in a session: those datasets are under data use agreements.
