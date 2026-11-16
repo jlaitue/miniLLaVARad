@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+configs/paths.yaml
+runs/
+results/
+manifests/
+logs/
+third_party/
+*.pt
+*.pth
+*.safetensors
+*.npz
+jobs/generated/

@@ -1,0 +1,20 @@
+# Values follow the published LLaVA-Rad scripts (scripts/pretrain.sh, scripts/finetune_lora.sh).
+# Batch sizes are effective: batch_size = per_gpu_batch * num_gpus * grad_accum.
+llm: lmsys/vicuna-7b-v1.5
+projector: mlp2x_gelu
+max_text_length: 2048
+alignment:
+  epochs: 1
+  lr: 1.0e-3
+  weight_decay: 0.0
+  warmup_ratio: 0.03
+  effective_batch_size: 512
+finetune:
+  epochs: 3
+  lr: 1.0e-4
+  weight_decay: 0.0
+  warmup_ratio: 0.03
+  effective_batch_size: 128
+  lora_r: 64
+  lora_alpha: 128
+  lora_dropout: 0.05

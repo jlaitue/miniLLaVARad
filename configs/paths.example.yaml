@@ -1,0 +1,12 @@
+# Copy to configs/paths.yaml and edit. See README for how to obtain each dataset.
+manifest_dir: manifests
+runs_dir: runs
+results_dir: results
+encoder_checkpoint: /path/to/biomedclipcxr_518_checkpoint.pt  # from huggingface.co/microsoft/llava-rad
+image_dirs:
+  MIMIC_CXR: /path/to/mimic-cxr-jpg/resized  # flat folder of <dicom_id>.jpg
+  IUXRAY: /path/to/iu_xray/images
+  CHEXPERT: /path/to/chexpert/resized/train  # flat folder of patient-study-view.jpg
+control_dirs:
+  coco: /path/to/coco/jpg
+  ct: /path/to/ct/png
