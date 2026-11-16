@@ -34,6 +34,20 @@ def save_resume_state(path, model, optimizer, scheduler, epoch, batch, update):
     temporary.replace(path)
 
 
+def start_wandb(args, run_dir, config):
+    """One W&B run per training stage; a restart from resume.pt continues the same run."""
+    import wandb
+
+    id_path = run_dir / "wandb_id.txt"
+    if not id_path.exists():
+        id_path.write_text(wandb.util.generate_id())
+    return wandb.init(
+        project=args.wandb_project, entity=args.wandb_entity, id=id_path.read_text().strip(), resume="allow",
+        name=f"T{args.tokens}_seed{args.seed}_{args.stage}", group=f"T{args.tokens}_seed{args.seed}",
+        job_type=args.stage, dir=str(run_dir), config=config,
+    )
+
+
 @torch.no_grad()
 def validation_loss(model, loader, stage, accelerator):
     model.eval()
@@ -56,6 +70,8 @@ def main():
     parser.add_argument("--max_batches", type=int, help="Stop early; for smoke tests and throughput checks.")
     parser.add_argument("--save_every", type=int, default=1000, help="Updates between resume checkpoints.")
     parser.add_argument("--paths", default=None)
+    parser.add_argument("--wandb_project", help="Log every update to this W&B project; off when omitted.")
+    parser.add_argument("--wandb_entity")
     args = parser.parse_args()
 
     if args.stage == "alignment" and args.tokens == 0:
@@ -127,8 +143,16 @@ def main():
         accelerator.print(f"Resuming from epoch {start_epoch}, batch {start_batch}, update {update}.")
 
     accelerator.print(f"{run_dir}: {len(train_set)} reports, {total_updates} updates, accumulation {grad_accum}.")
+    wandb_run = None
+    if args.wandb_project and accelerator.is_main_process:
+        wandb_run = start_wandb(args, run_dir, {
+            **OmegaConf.to_container(stage), "llm": config.llm, "max_grad_norm": config.max_grad_norm,
+            "tokens": args.tokens, "seed": args.seed, "num_gpus": world, "per_gpu_batch": args.per_gpu_batch,
+            "grad_accum": grad_accum, "train_reports": len(train_set), "total_updates": total_updates,
+        })
     model.train()
     log_path, started, batches_done = run_dir / "log.jsonl", time.time(), 0
+    micro_losses = []
     stop = False
     for epoch in range(start_epoch, stage.epochs):
         sampler.set_state(epoch, start_batch if epoch == start_epoch else 0)
@@ -137,6 +161,9 @@ def main():
             with accelerator.accumulate(model):
                 loss = model(batch, args.stage)
                 accelerator.backward(loss)
+                micro_losses.append(loss.detach())
+                if accelerator.sync_gradients:
+                    grad_norm = accelerator.clip_grad_norm_(parameters, config.max_grad_norm)
                 optimizer.step()
                 if accelerator.sync_gradients:
                     scheduler.step()
@@ -144,15 +171,22 @@ def main():
                 optimizer.zero_grad(set_to_none=True)
             batches_done += 1
 
-            if accelerator.sync_gradients and accelerator.is_main_process and update % 50 == 0:
+            if accelerator.sync_gradients:
+                # Mean over accumulation steps and GPUs, as the HF Trainer logs it.
+                step_loss = accelerator.reduce(torch.stack(micro_losses).mean(), "mean").item()
+                micro_losses = []
                 record = {
-                    "epoch": epoch, "update": update, "loss": loss.item(), "lr": scheduler.get_last_lr()[0],
-                    "seconds_per_batch": (time.time() - started) / batches_done,
-                    "peak_gb": torch.cuda.max_memory_allocated() / 2**30,
+                    "train/loss": step_loss, "train/learning_rate": scheduler.get_last_lr()[0],
+                    "train/grad_norm": float(grad_norm), "train/epoch": epoch + (index + 1) / sampler.batches_per_epoch,
+                    "perf/seconds_per_batch": (time.time() - started) / batches_done,
+                    "perf/peak_gb": torch.cuda.max_memory_allocated() / 2**30,
                 }
-                with log_path.open("a") as log:
-                    log.write(json.dumps(record) + "\n")
-                print(record, flush=True)
+                if wandb_run:
+                    wandb_run.log(record, step=update)
+                if accelerator.is_main_process and update % 50 == 0:
+                    with log_path.open("a") as log:
+                        log.write(json.dumps({"update": update, **record}) + "\n")
+                    print({"update": update, **record}, flush=True)
             if accelerator.sync_gradients and update % args.save_every == 0 and accelerator.is_main_process:
                 save_resume_state(resume_path, unwrapped, optimizer, scheduler, epoch, index + 1, update)
             if args.max_batches and batches_done >= args.max_batches:
@@ -166,6 +200,8 @@ def main():
             with log_path.open("a") as log:
                 log.write(json.dumps({"epoch": epoch, "update": update, "val_loss": val}) + "\n")
             print({"epoch": epoch, "val_loss": val}, flush=True)
+            if wandb_run:
+                wandb_run.log({"val/loss": val, "train/epoch": epoch + 1}, step=update)
         accelerator.wait_for_everyone()
 
     if accelerator.is_main_process:
@@ -179,6 +215,8 @@ def main():
             "completed_updates": update, "max_batches": args.max_batches,
         })
         resume_path.unlink(missing_ok=True)
+        if wandb_run:
+            wandb_run.finish()
     accelerator.wait_for_everyone()
 
 

@@ -3,6 +3,7 @@
 llm: lmsys/vicuna-7b-v1.5
 projector: mlp2x_gelu
 max_text_length: 2048
+max_grad_norm: 1.0  # HF Trainer default, which the LLaVA-Rad scripts do not override.
 alignment:
   epochs: 1
   lr: 1.0e-3

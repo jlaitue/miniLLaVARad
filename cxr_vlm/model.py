@@ -166,7 +166,8 @@ class ReportGenerator(nn.Module):
         run_dir.mkdir(parents=True, exist_ok=True)
         if self.num_vision_tokens > 0:
             torch.save(self.projector.state_dict(), run_dir / "projector.pt")
-        self.llm.save_pretrained(run_dir)
+        if isinstance(self.llm, PeftModel):  # Stage 1 leaves the LLM frozen; only the LoRA adapter is worth saving.
+            self.llm.save_pretrained(run_dir)
         (run_dir / "run.json").write_text(json.dumps(metadata, indent=2))
 
 

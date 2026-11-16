@@ -12,3 +12,6 @@ third_party/
 *.safetensors
 *.npz
 jobs/generated/
+runs_smoke*/
+configs/paths.smoke*.yaml
+wandb/

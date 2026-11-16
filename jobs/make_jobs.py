@@ -36,10 +36,11 @@ def write(name, text):
     return path
 
 
-def train_command(stage, tokens, seed, gpus, extra=""):
+def train_command(stage, tokens, seed, gpus, extra="", wandb_project=None):
     batch = PER_GPU_BATCH[(stage, tokens)]
+    wandb = f" --wandb_project {wandb_project}" if wandb_project else ""
     return (f"accelerate launch --num_processes {gpus} --mixed_precision bf16 train.py --stage {stage} "
-            f"--tokens {tokens} --seed {seed} --per_gpu_batch {batch}{extra}\n")
+            f"--tokens {tokens} --seed {seed} --per_gpu_batch {batch}{extra}{wandb}\n")
 
 
 def predict_tasks():
@@ -81,15 +82,24 @@ def main():
     parser.add_argument("--conda_env", default="llavarad")
     parser.add_argument("--hf_home", required=True)
     parser.add_argument("--cache_home", required=True, help="XDG cache that holds the CheXbert and RadGraph weights.")
+    parser.add_argument("--wandb_project", default="clinical-vlm-tokens", help="Empty string turns W&B off.")
     args = parser.parse_args()
     GENERATED.mkdir(exist_ok=True)
     (REPO / "logs").mkdir(exist_ok=True)
+    smoke_project = f"{args.wandb_project}-smoke" if args.wandb_project else None
 
     write("00_smoke_2gpu.sbatch", header(args, "smoke_2gpu", 2, "02:00:00") + "\n".join([
         "# Distributed checks with a throwaway runs folder: both stages for T=1 and T=1369.",
         "sed 's#^runs_dir:.*#runs_dir: runs_smoke#' configs/paths.yaml > configs/paths.smoke.yaml",
-        *[train_command(stage, tokens, 99, 2, " --max_batches 40 --save_every 1 --paths configs/paths.smoke.yaml").strip()
+        *[train_command(stage, tokens, 99, 2, " --max_batches 40 --save_every 1 --paths configs/paths.smoke.yaml",
+                        smoke_project).strip()
           for tokens in (1, 1369) for stage in ("alignment", "finetune")],
+    ]) + "\n")
+    write("01_smoke_t1_2gpu.sbatch", header(args, "smoke_t1", 2, "01:00:00") + "\n".join([
+        "# Short T=1 check of logging and gradient clipping before the real T=1 runs.",
+        "sed 's#^runs_dir:.*#runs_dir: runs_smoke_t1#' configs/paths.yaml > configs/paths.smoke_t1.yaml",
+        *[train_command(stage, 1, 99, 2, " --max_batches 20 --save_every 1 --paths configs/paths.smoke_t1.yaml",
+                        smoke_project).strip() for stage in ("alignment", "finetune")],
     ]) + "\n")
 
     for tokens in (1, 1369):
@@ -97,9 +107,11 @@ def main():
             for stage in ("alignment", "finetune"):
                 gpus, time = RESOURCES[(stage, tokens)]
                 write(f"train_T{tokens}_seed{seed}_{stage}.sbatch",
-                      header(args, f"T{tokens}s{seed}_{stage[:2]}", gpus, time) + train_command(stage, tokens, seed, gpus))
+                      header(args, f"T{tokens}s{seed}_{stage[:2]}", gpus, time)
+                      + train_command(stage, tokens, seed, gpus, wandb_project=args.wandb_project))
     gpus, time = RESOURCES[("finetune", 0)]
-    write("train_T0_seed0_finetune.sbatch", header(args, "T0s0_fi", gpus, time) + train_command("finetune", 0, 0, gpus))
+    write("train_T0_seed0_finetune.sbatch", header(args, "T0s0_fi", gpus, time)
+          + train_command("finetune", 0, 0, gpus, wandb_project=args.wandb_project))
 
     # T=1369 is trained last, so its generation runs get their own array.
     tasks = predict_tasks()
