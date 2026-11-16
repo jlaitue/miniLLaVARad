@@ -1,0 +1,11 @@
+manifest_dir: manifests
+runs_dir: runs_smoke
+results_dir: results
+encoder_checkpoint: /scratch/ljl5178/cache/MedUQ/vision_encoder_ckpts/BiomedCLIP_CXR/biomedclipcxr_518_checkpoint.pt
+image_dirs:
+  MIMIC_CXR: /scratch/fs999/shamoutlab/data/physionet.org/files/mimic-cxr-jpg/2.0.0/resized
+  IUXRAY: /scratch/fs999/shamoutlab/data/IU_X_ray/images
+  CHEXPERT: /scratch/fs999/shamoutlab/data/chexpert/resized/train
+control_dirs:
+  coco: /scratch/ljl5178/Datasets/COCO/jpg
+  ct: /scratch/ljl5178/Datasets/CT/png

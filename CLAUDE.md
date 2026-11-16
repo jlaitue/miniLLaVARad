@@ -9,7 +9,8 @@ Full paper from the ICML 2026 MechInterp workshop paper "Do Clinical VLMs Need D
 - One training seed per model (2026-11-02). The reviewers asked for multiple seeds and CIs on the random token sampling, not retraining. Sampling keeps 5 seeds. CIs therefore cover patients and token draws, not training variance, and the paper must say so.
 - Timeline: about 2 months of running is acceptable (user, 2026-11-02).
 - Release of MIMIC-trained checkpoints is parked until the end. Code license is also still open.
-- SLURM: the user validates every job before submission. Never submit without approval. `-q shamout` has 6 nodes shared with colleagues; `-q cair` has 2.
+- Autonomy (2026-11-16): the user is testing how far AI can fully automate this project, and Claude drives it end to end, including submitting SLURM jobs without per-job approval. Ask only when the user flags an action or a decision is theirs (framing, venue, release, license).
+- SLURM: QoS caps are group-wide GPU counts (checked 2026-11-16): `-q shamout` = 6 GPUs shared with colleagues, often full; `-q cair` = 2 GPUs. They are not tied to particular nodes.
 
 ## Bugs in the old pipeline, fixed here
 - T=1 used ImageNet normalization and bilinear resize; the encoder expects CLIP normalization and bicubic.
@@ -47,6 +48,6 @@ User's order (2026-11-16): cheap models first, T=1369 last. Goal is 3 fresh chec
 6. Still to write: figures and tables, aggregate OOD finding counts (Reviewer 1), and the paper. Fix the LoRA citation (Hu et al.).
 
 ## State at handoff (2026-11-02; updated 2026-11-16)
-Initial git commit made 2026-11-16. No jobs submitted yet. Waiting on the user to approve `00_smoke_2gpu.sbatch`, then the seed 0 jobs. `sbatch --test-only` showed these jobs would preempt running jobs (two checked were `preempt-big`), and the user was told. The jobs assume the A100 80 GB nodes cn263-268 are the `-q shamout` nodes; the user has not confirmed this. Regenerate scripts with `python jobs/make_jobs.py --hf_home ... --cache_home ...`. Full transcript of the earlier session: `~/.claude/projects/-scratch-ljl5178-project-beta-meduq/66f2ad74-2cbc-442a-99d9-0f9e8cd8cb14.jsonl`.
+Initial git commit made 2026-11-16. No jobs submitted yet. Waiting on the user to approve `00_smoke_2gpu.sbatch`, then the seed 0 jobs. `sbatch --test-only` showed these jobs would preempt running jobs (two checked were `preempt-big`), and the user was told. Regenerate scripts with `python jobs/make_jobs.py --hf_home ... --cache_home ...`. Full transcript of the earlier session: `~/.claude/projects/-scratch-ljl5178-project-beta-meduq/66f2ad74-2cbc-442a-99d9-0f9e8cd8cb14.jsonl`.
 
 Reviews are in `../meduq/mech_interp_icml_reviews.md`. Do not print MIMIC or CheXpert report text in a session: those datasets are under data use agreements.

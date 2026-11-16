@@ -24,7 +24,7 @@ def header(args, name, gpus, time, array=None):
         f"#SBATCH --time={time}", f"#SBATCH --cpus-per-task={8 * gpus}", f"#SBATCH --mem={80 * gpus}GB",
         f"#SBATCH -o logs/{name}.%A_%a.out" if array else f"#SBATCH -o logs/{name}.%j.out",
         f"#SBATCH --array={array}" if array else "",
-        "set -euo pipefail", f"cd {REPO}", 'eval "$(conda shell.bash hook)"', f"conda activate {args.conda_env}",
+        "set -euo pipefail", f"cd {REPO}", "set +u  # conda activate.d hooks read unset variables", 'eval "$(conda shell.bash hook)"', f"conda activate {args.conda_env}", "set -u",
         f"export HF_HOME={args.hf_home} XDG_CACHE_HOME={args.cache_home} TOKENIZERS_PARALLELISM=false", "",
     ]
     return "\n".join(line for line in lines if line != "" or line is lines[-1]) + "\n"
