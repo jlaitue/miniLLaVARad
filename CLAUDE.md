@@ -10,7 +10,7 @@ Full paper from the ICML 2026 MechInterp workshop paper "Do Clinical VLMs Need D
 - Timeline: about 2 months of running is acceptable (user, 2026-11-02).
 - Release of MIMIC-trained checkpoints is parked until the end. Code license is also still open.
 - Autonomy (2026-11-16): the user is testing how far AI can fully automate this project, and Claude drives it end to end, including submitting SLURM jobs without per-job approval. Ask only when the user flags an action or a decision is theirs (framing, venue, release, license).
-- SLURM: QoS caps are group-wide GPU counts (checked 2026-11-16): `-q shamout` = 6 GPUs shared with colleagues, often full; `-q cair` = 2 GPUs. They are not tied to particular nodes.
+- SLURM: QoS caps are group-wide GPU counts (checked 2026-11-16): `-q shamout` = 6 GPUs shared with colleagues, often full; `-q cair` = 2 GPUs. They are not tied to particular nodes. General `-q nvidia` = 12 GPUs per user, lower priority but usable for wide arrays (2026-11-17).
 
 ## Bugs in the old pipeline, fixed here
 - T=1 used ImageNet normalization and bilinear resize; the encoder expects CLIP normalization and bicubic.
@@ -53,4 +53,4 @@ Smoke tests passed on 2xA100 80GB (cair) for both stages of T=1 and T=1369; W&B 
 Reviews are in `../meduq/mech_interp_icml_reviews.md`. Do not print MIMIC or CheXpert report text in a session: those datasets are under data use agreements.
 
 ## Update (2026-11-17)
-T=1 seed 0 done: alignment 3.2 h, finetune 16.5 h on 2xA100 (cair); val loss by epoch 0.805 / 0.783 / 0.796; checkpoint `runs/T1_seed0/finetune` (LoRA adapter + projector). T=0 finetune 19395855 running on cair since 08:00, 6.05 s/batch, 9375 updates, expected done around 00:00 on 2026-11-18. Main prediction array 19417825 submitted on shamout, all tasks except the 3 T=0 lines (9, 72, 134), throttled to 4 GPUs; submit those 3 once T=0 finishes (`sbatch --array=9,72,134 jobs/generated/predict_array_main.sbatch`). Freshly booted nodes take ~15 min to start a task (cold Lustre page cache for the conda env and Vicuna weights); it is not a hang. MIMIC generation ~13 s/batch of 32.
+T=1 seed 0 done: alignment 3.2 h, finetune 16.5 h on 2xA100 (cair); val loss by epoch 0.805 / 0.783 / 0.796; checkpoint `runs/T1_seed0/finetune` (LoRA adapter + projector). T=0 finetune 19395855 running on cair since 08:00, 6.05 s/batch, 9375 updates, expected done around 00:00 on 2026-11-18. Main prediction array split: 19417825 (shamout, tasks 1-60 minus 9, %4) and 19418162 (`-q nvidia`, tasks 61-188 minus 72 and 134, %10). The `nvidia` QoS allows 12 GPUs per user, is not preempted, but has low priority. The 3 T=0 lines (9, 72, 134) are held back; submit those 3 once T=0 finishes (`sbatch --array=9,72,134 jobs/generated/predict_array_main.sbatch`). Freshly booted nodes take ~15 min to start a task (cold Lustre page cache for the conda env and Vicuna weights); it is not a hang. MIMIC generation ~13 s/batch of 32.
